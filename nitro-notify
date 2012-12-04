@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+#
+#  Copyright 2012, Chin <ndtrung at gmail dot com>
+#
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+#  MA 02110-1301, USA.
+#  
+
+import sys, os, signal
+import notify2
+from gi.repository import GLib
+
+# Các biến config, sửa nếu thấy cần thiết
+data_path = "/media/Linux-Data/Dropbox/Apps/Nitro/todo.txt"
+app_name = "nitro-notify"
+interval = 60000 * 15 # 15 phút
+
+def print_usage():
+    """Nothing to do here...
+    """
+    print("Nhớ phải mở code ra sửa biến `data_path` trước đã!")
+    sys.exit(-1)
+
+def update_list(f):
+    """Tìm các dòng kết thúc bởi tag '@today' trong file f, nối lại thành một string
+    phân cách bởi dấu xuống dòng và return string đó.
+    """
+    f.seek(0)
+    l = []
+    for line in f:
+        if line.rstrip().endswith("@today"):
+            l.append(line.rstrip().replace(" @today", ""))
+    return "\n".join(l)
+
+def show_notification():
+    """Hàm callback, được gọi bởi GLib.timeout_add. Mỗi lần chạy lại
+    đọc toàn bộ danh sách từ ổ cứng và tạo notification.
+    """
+    try:
+        todo = open(data_path)
+    except:
+        print_usage()
+    
+    summary = "Eh, nhớ là hôm nay phải làm những cái này này:"
+    body = update_list(todo)
+    n = notify2.Notification(summary, body)
+    n.show()
+    return True # Lặp mãi mãi
+
+def main():
+    show_notification()
+    
+    # http://developer.gnome.org/glib/2.31/glib-The-Main-Event-Loop.html#g-timeout-add
+    # TODO: có thể sử dụng phương pháp timeout của Python chứ không cần sử dụng
+    #       đến thư viện GLib.
+    GLib.timeout_add(interval, show_notification)
+    
+    loop = GLib.MainLoop()
+    loop.run()
+
+def interrupt_handler(signal_num, stack_frame):
+    notify2.uninit()
+    sys.exit(0)
+
+# Chương trình bắt đầu chạy từ đây
+if __name__ == "__main__":
+    # Xử lý Ctrl-C
+    signal.signal(signal.SIGINT, interrupt_handler)
+    
+    notify2.init(app_name)
+    main()
